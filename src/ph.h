@@ -2,17 +2,20 @@
 #define PH_H
 
 #include <stddef.h> 
+#include "hash.h"
 
 typedef struct { 
-    char **keys; // array of keys 
-    size_t size; // num of slots in secondary hash table 
-    unsigned int seed; // seed for secondary hash 
+    char **keys; 
+    size_t key_count; 
+    size_t table_size; 
+    Universal_Hash_Params params; 
 } ph_bucket_t; 
 
 typedef struct { 
     size_t n; // num of keys in total
     size_t m; // num of total buckets
     ph_bucket_t *buckets; // array of buckets 
+    Universal_Hash_Params level1_params;
 } ph_table; 
 
 /**
