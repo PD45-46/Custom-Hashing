@@ -25,7 +25,7 @@
  * @return integer hash value between [0, table_size] 
  * 
  */
-unsigned int universal_hash(char* key, Universal_Hash_Params* params) { 
+unsigned int universal_hash(const char* key, Universal_Hash_Params* params) { 
     
     unsigned long long hash = params->rand_additive; 
 
@@ -59,7 +59,7 @@ void init_universal_hash(Universal_Hash_Params* params, unsigned int table_size,
 
     params->rand_additive = (unsigned int)(rand() % params->prime); 
 
-    for(int i = 0; i < max_str_len; i++) { 
+    for(unsigned int i = 0; i < max_str_len; i++) { 
         unsigned int r = (unsigned int) rand(); 
         params->coeff_array[i] = (r % (params->prime - 1)) + 1; 
     }

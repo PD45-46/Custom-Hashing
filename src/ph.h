@@ -2,7 +2,16 @@
 #define PH_H
 
 #include <stddef.h> 
-#include "hash.h"
+
+typedef struct { 
+    
+    unsigned int prime; 
+    unsigned int table_size; 
+    unsigned int rand_additive; 
+    unsigned int max_str_len; 
+    unsigned int* coeff_array; 
+
+} Universal_Hash_Params; 
 
 typedef struct { 
     char **keys; 
@@ -22,14 +31,14 @@ typedef struct {
  * @brief 
  * 
  * */
-ph_table *mph_build(char **keys, size_t n); 
+ph_table *ph_build(char **keys, size_t n, size_t max_str_len);
 
 /** 
  * @brief Look up a key in the hash table t in the index... 
  */
-int mph_lookup(ph_table *t, const char *key, size_t *out_index); 
+int ph_lookup(ph_table *t, const char *key);
 
 /* Frees all mem */
-void mph_free(ph_table *t); 
+void ph_free(ph_table *t); 
 
 #endif
