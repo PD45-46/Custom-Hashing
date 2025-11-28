@@ -138,15 +138,40 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len) {
 }
 
 
-ph_table ph_build() { 
+ph_table *ph_build(char **keys, size_t n, size_t max_str_len) { 
+    ph_table *t = calloc(1, sizeof(ph_table)); 
+    build_first_level_bucketing(t, keys, n, max_str_len); 
+    for(size_t i = 0; i < t->m; i++) { 
+        build_second_level_bucketing(&t->buckets[i], max_str_len); 
+    }
+    return t; 
 }
 
-int ph_lookup() { 
-    return 0; 
-}
-
-void ph_free() { 
+int ph_lookup(ph_table *t, const char *key) { 
     
+    unsigned int h1 = universal_hash(key, &t->level1_params) % t->m; 
+    ph_bucket_t *b = &t->buckets[h1]; 
+
+    if(b->key_count == 0) return -1; 
+    if(b->key_count == 1) { 
+         return strcmp(b->keys[0], key) == 0 ? 0 : -1; 
+    }
+
+    unsigned int h2 = universal_hash(key, &b->params) % b->table_size; 
+    return (b->keys[h2] && strcmp(b->keys[h2], key) == 0) ? 0 : -1; 
+}
+
+void ph_free(ph_table *t) { 
+    if(!t) return; 
+
+    free_universal_hash(&t->level1_params); 
+    for(size_t i = 0; i < t->m; i++) { 
+        ph_bucket_t *b =  &t->buckets[i]; 
+        free_universal_hash(&b->params); 
+        free(b->keys); 
+    }
+    free(t->buckets); 
+    free(t); 
 }
 
 
