@@ -115,11 +115,13 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len) {
             
             if(table[h] != NULL) { 
                 collision = 1; 
+                // printf("Collision for position %d in table, must retry.\n", h); 
                 break; 
             }
 
             table[h] = b->keys[i]; 
         }
+
 
         if(!collision) { 
             free(b->keys); 
