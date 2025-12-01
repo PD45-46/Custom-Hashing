@@ -9,7 +9,7 @@ int compare_doubles(const void *a, const void *b) {
 
 double calc_min(double *values, size_t n) { 
     double min = values[0]; 
-    for(int i = 1; i < n; i++) { 
+    for(size_t i = 1; i < n; i++) { 
         if(min > values[i]) min = values[i]; 
     }
     return min; 
@@ -17,7 +17,7 @@ double calc_min(double *values, size_t n) {
 
 double calc_max(double *values, size_t n) { 
     double max = values[0]; 
-    for(int i = 1; i < n; i++) { 
+    for(size_t i = 1; i < n; i++) { 
         if(max < values[i]) max = values[i]; 
     }
     return max; 
@@ -25,7 +25,7 @@ double calc_max(double *values, size_t n) {
 
 double calc_mean(double *values, size_t n) { 
     double mean = 0; 
-    for(int i = 0; i < n; i++) { 
+    for(size_t i = 0; i < n; i++) { 
         mean += values[i]; 
     }
     return mean/n; 

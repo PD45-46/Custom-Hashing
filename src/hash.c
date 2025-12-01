@@ -91,7 +91,8 @@ void build_first_level_bucketing(ph_table *t, char **keys, size_t n, size_t max_
 }
 
 
-void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len, int hash_type) { 
+void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len, 
+    int hash_type, build_metrics_t *metrics) { 
 
     size_t k = b->key_count; 
 
@@ -100,31 +101,23 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len, int hash_t
         return; 
     }
 
-    size_t m2;
-
-    if(hash_type == 0) { 
-        m2 = k * k; 
-    } else { 
-        m2 = k; 
-    }
+    size_t m2 = (hash_type == 0) ? k * k : k; 
 
     char **table = NULL; 
-    int max_attempts = 1000; 
     int attempt = 0; 
 
-    while(attempt < max_attempts) { 
+    while(1) { 
+        attempt++; 
         init_universal_hash(&b->params, m2, max_str_len); 
         table = calloc(m2, sizeof(char *)); 
         int collision = 0; 
-
-
 
         for(size_t i = 0; i < k; i++) { 
             unsigned int h = universal_hash(b->keys[i], &b->params);
             
             if(table[h] != NULL) { 
                 collision = 1; 
-                // printf("Collision for position %d in table, must retry.\n", h); 
+                if(metrics) metrics->total_collisions++; 
                 break; 
             }
 
@@ -136,28 +129,36 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len, int hash_t
             free(b->keys); 
             b->keys = table; 
             b->table_size = m2; 
+            
+            if(metrics) { 
+                metrics->total_attempts += attempt;
+                metrics->total_buckets_processed++; 
+                if(attempt > metrics->max_attemps_bucket) { 
+                    metrics->max_attemps_bucket = attempt; 
+                } 
+            }
             return; 
         }
 
         free(table); 
         attempt++; 
     }
-
-    if(hash_type == 0) { 
-        fprintf(stderr, "Warning: Couldn't create perfect hash table size (N^2) with %zu slots after %d attemps.\n",
-                k*k, max_attempts); 
-    } else { 
-        fprintf(stderr, "Warning: Couldn't create perfect hash table size (N) with %zu slots after %d attemps.\n",
-                k, max_attempts); 
-    }
 }
 
 
-ph_table *ph_build(char **keys, size_t n, size_t max_str_len, int hash_type) { 
-    ph_table *t = calloc(1, sizeof(ph_table)); 
+ph_table *ph_build(char **keys, size_t n, size_t max_str_len, int hash_type, build_metrics_t *metrics) { 
+    ph_table *t = calloc(1, sizeof(ph_table));  
+
+    if(metrics) { 
+        metrics->total_attempts = 0; 
+        metrics->max_attemps_bucket = 0; 
+        metrics->total_buckets_processed = 0; 
+        metrics->total_collisions = 0; 
+    }
+
     build_first_level_bucketing(t, keys, n, max_str_len); 
     for(size_t i = 0; i < t->m; i++) { 
-        build_second_level_bucketing(&t->buckets[i], max_str_len, hash_type);
+        build_second_level_bucketing(&t->buckets[i], max_str_len, hash_type, metrics);
     }
     return t; 
 }

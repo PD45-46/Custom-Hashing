@@ -3,6 +3,19 @@
 #include <string.h>
 #include <time.h>
 #include "../src/ph.h"
+#include "stats.h"
+
+#define NUM_TRIALS 10
+#define WARMUP_RUNS 3
+
+typedef struct {
+    double build_time;
+    double lookup_time;
+    size_t memory_bytes;
+    build_metrics_t build_metrics;
+} trial_result_t;
+
+
 
 /**
  * @brief Generate s a bunch of random keys 
@@ -71,40 +84,199 @@ static char **key_set_cleaner(char **keys, int *n) {
     return keys;
 }
 
-void benchmark_ph(int n, int key_len, int hash_type) { 
-    char **keys = generate_keys(n, key_len); 
+double get_time_seconds() { 
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts); 
+    return ts.tv_sec + ts.tv_nsec / 1e9; 
+}
 
+/** 
+ * @brief Calculates the amount of memory space used up 
+ *        by a hash table. 
+ */
+size_t calc_mem(ph_table *t, size_t max_str_len) { 
+    size_t total = 0; 
+
+    // Table 
+    total += sizeof(ph_table); 
+
+    // Level 1 bucket 
+    total += t->m * sizeof(ph_bucket_t); 
+
+    // Hash params 
+    total += sizeof(Universal_Hash_Params); 
+    total += max_str_len * sizeof(unsigned int); 
+
+    // Level 2 bucket 
+    for(size_t i = 0; i < t->m; i++) { 
+        ph_bucket_t *b = &t->buckets[i]; 
+        if(b->key_count == 0) continue;
+        total += b->table_size * sizeof(char *);
+        if(b->key_count > 1) { 
+            total += sizeof(Universal_Hash_Params); 
+            total += max_str_len * sizeof(unsigned int); 
+        }
+    } 
+    return total; 
+}
+
+trial_result_t single_trial(int n, int key_len, int hash_type) { 
+    trial_result_t result = {0}; 
+
+    char **keys = generate_keys(n, key_len); 
+    int original_n = n; 
     keys = key_set_cleaner(keys, &n); 
 
-    clock_t start = clock(); 
-    ph_table *ht = ph_build(keys, n, key_len, hash_type); 
-    clock_t end = clock(); 
-    double build_time = (double)(end - start)/CLOCKS_PER_SEC; 
+    double start = get_time_seconds(); 
+    ph_table *ht = ph_build(keys, n, key_len, hash_type, &result.build_metrics); 
+    double end = get_time_seconds(); 
+    result.build_time = end - start; 
 
-    printf("\n"); 
-    
-    if(hash_type == 0) { 
-        printf("Hash Type: Regular Perfect Hashing\n"); 
-    } else { 
-        printf("Hash Type: Minimal Perfect Hashing\n"); 
-    }
+    result.memory_bytes = calc_mem(ht, key_len); 
 
-    printf("PH Build Time for %d keys and %d key len: %f sec\n", n, key_len, build_time); 
-    
-    // lookup benchmark 
-    start = clock(); 
+    start = get_time_seconds(); 
     for(int i = 0; i < n; i++) { 
         int found = ph_lookup(ht, keys[i]); 
-        if(found == -1) printf("Error: Key not found\n"); 
+        if(found == -1) { 
+            printf("Error: Key '%s'  not found\n", keys[i]); 
+        }
     }
-    end = clock(); 
-    double lookup_time = (double)(end - start)/CLOCKS_PER_SEC; 
-    printf("PH Lookup Time for %d keys: %f sec\n", n, lookup_time); 
-    printf("\n"); 
+    end = get_time_seconds(); 
+    result.lookup_time = (end - start) / n; //  per key avg 
 
     ph_free(ht); 
-    free_keys(keys, n); 
+    free_keys(keys, original_n);
+    
+    return result; 
 }
+
+/** 
+ * @brief Note that we use warmup runs to ensure that caches contain information for 
+ *        all runs to ensure consistency between multiple trials. I've seen that 
+ *        the first trial always seems to be a little slower than subsequent ones given 
+ *        the same params and which is why i added the warmup. 
+ */
+void benchmark_ph(int n, int key_len, int hash_type) { 
+    printf("========================================\n");
+    if(hash_type == 0) {
+        printf("\033[32mHash Type: Regular Perfect Hashing (O(n^2))\033[0m\n");
+    } else {
+        printf("\033[36mHash Type: Minimal Perfect Hashing (O(n))\033[0m\n");
+    }
+    printf("Dataset: %d keys, %d chars per key\n", n, key_len);
+    printf("========================================\n");
+
+    // Warmup runs 
+    printf("Running %d warmup trial runs... \n", WARMUP_RUNS); 
+    for(int i = 0; i < WARMUP_RUNS; i++) { 
+        trial_result_t warmup = single_trial(n, key_len, hash_type); 
+        (void)warmup; // supress the unused warning
+    }
+
+    printf("Running %d benchmark trial runs... \n", NUM_TRIALS); 
+    double *build_times = malloc(NUM_TRIALS * sizeof(double)); 
+    double *lookup_times = malloc(NUM_TRIALS * sizeof(double)); 
+    size_t *memory_sizes = malloc(NUM_TRIALS * sizeof(size_t)); 
+    int *total_attempts = malloc(NUM_TRIALS * sizeof(int));
+    int *max_attempts = malloc(NUM_TRIALS * sizeof(int));
+    
+    for(int trial = 0; trial < NUM_TRIALS; trial++) { 
+        trial_result_t result = single_trial(n, key_len, hash_type); 
+        build_times[trial] = result.build_time; 
+        lookup_times[trial] = result.lookup_time; 
+        memory_sizes[trial] = result.memory_bytes; 
+        total_attempts[trial] = result.build_metrics.total_attempts; 
+        max_attempts[trial] = result.build_metrics.max_attemps_bucket; 
+
+        printf("Trial %d: build=%.6fs, lookup=%.9fs, mem=%zuKB\n", 
+            trial + 1, result.build_time, result.lookup_time, result.memory_bytes / 1024); 
+    }
+
+    stats_t build_stats = calc_stats(build_times, NUM_TRIALS); 
+    stats_t lookup_stats = calc_stats(lookup_times, NUM_TRIALS); 
+
+    double mem_vals[NUM_TRIALS]; 
+    double attempts_vals[NUM_TRIALS];
+    for(int i = 0; i < NUM_TRIALS; i++) { 
+        mem_vals[i] = (double)memory_sizes[i];
+        attempts_vals[i] = (double)total_attempts[i]; 
+    }
+    stats_t mem_stats = calc_stats(mem_vals, NUM_TRIALS);   
+    stats_t attempts_stats = calc_stats(attempts_vals, NUM_TRIALS);
+    
+    printf("\n--- BUILD TIME (seconds) ---\n");
+    printf("  Min:    %.6f\n", build_stats.min);
+    printf("  Median: %.6f\n", build_stats.median);
+    printf("  Mean:   %.6f\n", build_stats.mean);
+    printf("  P95:    %.6f\n", build_stats.p95);
+    printf("  P99:    %.6f\n", build_stats.p99);
+    printf("  Max:    %.6f\n", build_stats.max);
+    printf("  StdDev: %.6f\n", build_stats.std_dev);
+    
+    printf("\n--- LOOKUP TIME (seconds per key) ---\n");
+    printf("  Min:    %.9f\n", lookup_stats.min);
+    printf("  Median: %.9f\n", lookup_stats.median);
+    printf("  Mean:   %.9f\n", lookup_stats.mean);
+    printf("  P95:    %.9f\n", lookup_stats.p95);
+    printf("  P99:    %.9f\n", lookup_stats.p99);
+    printf("  Max:    %.9f\n", lookup_stats.max);
+    
+    printf("\n--- MEMORY USAGE ---\n");
+    printf("  Median: %zu bytes (%.2f KB, %.2f MB)\n",
+           (size_t)mem_stats.median,
+           mem_stats.median / 1024.0,
+           mem_stats.median / (1024.0 * 1024.0));
+    printf("  Per key: %.2f bytes\n", mem_stats.median / n);
+    
+    printf("\n--- BUILD METRICS ---\n");
+    printf("  Avg total attempts: %.1f\n", attempts_stats.mean);
+    printf("  Max attempts (worst bucket): %d\n", max_attempts[0]);
+    
+    // Cleanup
+    free(build_times);
+    free(lookup_times);
+    free(memory_sizes);
+    free(total_attempts);
+    free(max_attempts);
+}
+
+
+
+
+// void benchmark_ph(int n, int key_len, int hash_type) { 
+//     char **keys = generate_keys(n, key_len); 
+
+//     keys = key_set_cleaner(keys, &n); 
+
+//     clock_t start = clock(); 
+//     ph_table *ht = ph_build(keys, n, key_len, hash_type); 
+//     clock_t end = clock(); 
+//     double build_time = (double)(end - start)/CLOCKS_PER_SEC; 
+
+//     printf("\n"); 
+    
+//     if(hash_type == 0) { 
+//         printf("Hash Type: Regular Perfect Hashing\n"); 
+//     } else { 
+//         printf("Hash Type: Minimal Perfect Hashing\n"); 
+//     }
+
+//     printf("PH Build Time for %d keys and %d key len: %f sec\n", n, key_len, build_time); 
+    
+//     // lookup benchmark 
+//     start = clock(); 
+//     for(int i = 0; i < n; i++) { 
+//         int found = ph_lookup(ht, keys[i]); 
+//         if(found == -1) printf("Error: Key not found\n"); 
+//     }
+//     end = clock(); 
+//     double lookup_time = (double)(end - start)/CLOCKS_PER_SEC; 
+//     printf("PH Lookup Time for %d keys: %f sec\n", n, lookup_time); 
+//     printf("\n"); 
+
+//     ph_free(ht); 
+//     free_keys(keys, n); 
+// }
 
 int main(int argc, char *argv[]) { 
     if(argc != 3) { 
