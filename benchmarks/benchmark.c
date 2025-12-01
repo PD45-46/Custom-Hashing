@@ -71,15 +71,24 @@ static char **key_set_cleaner(char **keys, int *n) {
     return keys;
 }
 
-void benchmark_ph(int n, int key_len) { 
+void benchmark_ph(int n, int key_len, int hash_type) { 
     char **keys = generate_keys(n, key_len); 
 
     keys = key_set_cleaner(keys, &n); 
 
     clock_t start = clock(); 
-    ph_table *ht = ph_build(keys, n, key_len); 
+    ph_table *ht = ph_build(keys, n, key_len, hash_type); 
     clock_t end = clock(); 
     double build_time = (double)(end - start)/CLOCKS_PER_SEC; 
+
+    printf("\n"); 
+    
+    if(hash_type == 0) { 
+        printf("Hash Type: Regular Perfect Hashing\n"); 
+    } else { 
+        printf("Hash Type: Minimal Perfect Hashing\n"); 
+    }
+
     printf("PH Build Time for %d keys and %d key len: %f sec\n", n, key_len, build_time); 
     
     // lookup benchmark 
@@ -91,6 +100,7 @@ void benchmark_ph(int n, int key_len) {
     end = clock(); 
     double lookup_time = (double)(end - start)/CLOCKS_PER_SEC; 
     printf("PH Lookup Time for %d keys: %f sec\n", n, lookup_time); 
+    printf("\n"); 
 
     ph_free(ht); 
     free_keys(keys, n); 
@@ -105,6 +115,7 @@ int main(int argc, char *argv[]) {
     int n = atoi(argv[1]); 
     int key_len = atoi(argv[2]); 
 
-    benchmark_ph(n, key_len); 
+    benchmark_ph(n, key_len, 0);
+    benchmark_ph(n, key_len, 1); 
     return 0; 
 }

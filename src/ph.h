@@ -3,6 +3,18 @@
 
 #include <stddef.h> 
 
+/**
+ * Note that this version of perfect hashing is static meaning the input 
+ * keys are static throughout the use of the hash table. Performing insertion
+ * and deletion operations will require us to rebuild the entire table to 
+ * accommodate for the changes. -> 
+ *      - O(L) Amortized Lookup, 
+ *      - O(nL) Expected Build 
+ * 
+ * n: Number of keys 
+ * L: Max string length 
+ */
+
 typedef struct { 
     
     unsigned int prime; 
@@ -31,7 +43,7 @@ typedef struct {
  * @brief 
  * 
  * */
-ph_table *ph_build(char **keys, size_t n, size_t max_str_len);
+ph_table *ph_build(char **keys, size_t n, size_t max_str_len, int hash_type);
 
 /** 
  * @brief Look up a key in the hash table t in the index... 

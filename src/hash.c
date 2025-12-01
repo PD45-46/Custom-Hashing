@@ -91,7 +91,7 @@ void build_first_level_bucketing(ph_table *t, char **keys, size_t n, size_t max_
 }
 
 
-void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len) { 
+void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len, int hash_type) { 
 
     size_t k = b->key_count; 
 
@@ -100,10 +100,19 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len) {
         return; 
     }
 
-    size_t m2 = k * k; // perfect hashing method 1 guarantee O(N^2)
-    char **table = NULL; 
+    size_t m2;
 
-    while(1) { 
+    if(hash_type == 0) { 
+        m2 = k * k; 
+    } else { 
+        m2 = k; 
+    }
+
+    char **table = NULL; 
+    int max_attempts = 1000; 
+    int attempt = 0; 
+
+    while(attempt < max_attempts) { 
         init_universal_hash(&b->params, m2, max_str_len); 
         table = calloc(m2, sizeof(char *)); 
         int collision = 0; 
@@ -131,20 +140,24 @@ void build_second_level_bucketing(ph_bucket_t *b, size_t max_str_len) {
         }
 
         free(table); 
+        attempt++; 
     }
 
-
-
-
-
+    if(hash_type == 0) { 
+        fprintf(stderr, "Warning: Couldn't create perfect hash table size (N^2) with %zu slots after %d attemps.\n",
+                k*k, max_attempts); 
+    } else { 
+        fprintf(stderr, "Warning: Couldn't create perfect hash table size (N) with %zu slots after %d attemps.\n",
+                k, max_attempts); 
+    }
 }
 
 
-ph_table *ph_build(char **keys, size_t n, size_t max_str_len) { 
+ph_table *ph_build(char **keys, size_t n, size_t max_str_len, int hash_type) { 
     ph_table *t = calloc(1, sizeof(ph_table)); 
     build_first_level_bucketing(t, keys, n, max_str_len); 
     for(size_t i = 0; i < t->m; i++) { 
-        build_second_level_bucketing(&t->buckets[i], max_str_len); 
+        build_second_level_bucketing(&t->buckets[i], max_str_len, hash_type);
     }
     return t; 
 }
@@ -175,5 +188,3 @@ void ph_free(ph_table *t) {
     free(t->buckets); 
     free(t); 
 }
-
-

@@ -10,7 +10,7 @@ void test_ph1_correctness() {
     char *keys[] = {"apple" , "banana", "carrot", "date", "fig", "grape", "honeydew"};
     size_t n = sizeof(keys)/sizeof(keys[0]); 
     size_t max_str_len = 10;
-    ph_table *t = ph_build(keys, n, max_str_len); 
+    ph_table *t = ph_build(keys, n, max_str_len, 0); 
 
     int errors = 0; 
     for(size_t i = 0; i < n; i++) { 
@@ -65,7 +65,7 @@ void test_prob(int trials, int n) {
     keys[1] = strdup("aaa"); 
 
     for(int t = 0; t < trials; t++) { 
-        ph_table *ht = ph_build(keys, n, max_str_len); 
+        ph_table *ht = ph_build(keys, n, max_str_len, 0); 
         int collisions = 0; 
 
         // check each second-level table for collisions 
