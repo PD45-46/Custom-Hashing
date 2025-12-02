@@ -4,6 +4,7 @@
 #include <time.h>
 #include "../src/ph.h"
 #include "stats.h"
+#include "cache_perf.h"
 
 #define NUM_TRIALS 10
 #define WARMUP_RUNS 3
@@ -13,6 +14,7 @@ typedef struct {
     double lookup_time;
     size_t memory_bytes;
     build_metrics_t build_metrics;
+    cache_metrics_t cache_metrics; 
 } trial_result_t;
 
 
@@ -143,6 +145,7 @@ trial_result_t single_trial(int n, int key_len, int hash_type) {
     }
     end = get_time_seconds(); 
     result.lookup_time = (end - start) / n; //  per key avg 
+    // result.cache_metrics = measure_cache_performance(ht, keys, n); 
 
     ph_free(ht); 
     free_keys(keys, original_n);
@@ -179,6 +182,10 @@ void benchmark_ph(int n, int key_len, int hash_type) {
     size_t *memory_sizes = malloc(NUM_TRIALS * sizeof(size_t)); 
     int *total_attempts = malloc(NUM_TRIALS * sizeof(int));
     int *max_attempts = malloc(NUM_TRIALS * sizeof(int));
+
+    // long long *cache_refs = malloc(NUM_TRIALS * sizeof(long long)); 
+    // long long *cache_misses = malloc(NUM_TRIALS * sizeof(long long)); 
+    // double *cache_miss_rates = malloc(NUM_TRIALS * sizeof(double)); 
     
     for(int trial = 0; trial < NUM_TRIALS; trial++) { 
         trial_result_t result = single_trial(n, key_len, hash_type); 
@@ -188,8 +195,12 @@ void benchmark_ph(int n, int key_len, int hash_type) {
         total_attempts[trial] = result.build_metrics.total_attempts; 
         max_attempts[trial] = result.build_metrics.max_attemps_bucket; 
 
-        printf("Trial %d: build=%.6fs, lookup=%.9fs, mem=%zuKB\n", 
-            trial + 1, result.build_time, result.lookup_time, result.memory_bytes / 1024); 
+        // cache_refs[trial] = result.cache_metrics.cache_references;
+        // cache_misses[trial] = result.cache_metrics.cache_misses;
+        // cache_miss_rates[trial] = result.cache_metrics.cache_miss_rate;
+
+        printf("Trial %d: build=%.6fs, lookup=%.9fs, mem=%zuKB, cache_miss=%.2f%%\n", 
+            trial + 1, result.build_time, result.lookup_time, result.memory_bytes / 1024, result.cache_metrics.cache_miss_rate); 
     }
 
     stats_t build_stats = calc_stats(build_times, NUM_TRIALS); 
@@ -197,12 +208,20 @@ void benchmark_ph(int n, int key_len, int hash_type) {
 
     double mem_vals[NUM_TRIALS]; 
     double attempts_vals[NUM_TRIALS];
+    // double cache_ref_vals[NUM_TRIALS];
+    // double cache_miss_vals[NUM_TRIALS];
+
     for(int i = 0; i < NUM_TRIALS; i++) { 
         mem_vals[i] = (double)memory_sizes[i];
         attempts_vals[i] = (double)total_attempts[i]; 
+        // cache_ref_vals[i] = (double)cache_refs[i];
+        // cache_miss_vals[i] = (double)cache_misses[i];
     }
     stats_t mem_stats = calc_stats(mem_vals, NUM_TRIALS);   
     stats_t attempts_stats = calc_stats(attempts_vals, NUM_TRIALS);
+    // stats_t cache_miss_rate_stats = calc_stats(cache_miss_rates, NUM_TRIALS);
+    // stats_t cache_ref_stats = calc_stats(cache_ref_vals, NUM_TRIALS);
+    // stats_t cache_miss_stats = calc_stats(cache_miss_vals, NUM_TRIALS);
     
     printf("\n--- BUILD TIME (seconds) ---\n");
     printf("  Min:    %.6f\n", build_stats.min);
@@ -231,6 +250,15 @@ void benchmark_ph(int n, int key_len, int hash_type) {
     printf("\n--- BUILD METRICS ---\n");
     printf("  Avg total attempts: %.1f\n", attempts_stats.mean);
     printf("  Max attempts (worst bucket): %d\n", max_attempts[0]);
+
+    // printf("\n--- CACHE PERFORMANCE ---\n");
+    // printf("  Median cache references: %.0f\n", cache_ref_stats.median);
+    // printf("  Median cache misses: %.0f\n", cache_miss_stats.median);
+    // printf("  Mean cache miss rate: %.2f%%\n", cache_miss_rate_stats.mean);
+    // printf("  Median cache miss rate: %.2f%%\n", cache_miss_rate_stats.median);
+    // printf("  P95 cache miss rate: %.2f%%\n", cache_miss_rate_stats.p95);
+    // printf("  Avg cache refs per lookup: %.2f\n", cache_ref_stats.mean / n);
+    // printf("  Avg cache misses per lookup: %.2f\n", cache_miss_stats.mean / n);
     
     // Cleanup
     free(build_times);
@@ -238,45 +266,12 @@ void benchmark_ph(int n, int key_len, int hash_type) {
     free(memory_sizes);
     free(total_attempts);
     free(max_attempts);
+    // free(cache_refs);
+    // free(cache_misses);
+    // free(cache_miss_rates);
 }
 
 
-
-
-// void benchmark_ph(int n, int key_len, int hash_type) { 
-//     char **keys = generate_keys(n, key_len); 
-
-//     keys = key_set_cleaner(keys, &n); 
-
-//     clock_t start = clock(); 
-//     ph_table *ht = ph_build(keys, n, key_len, hash_type); 
-//     clock_t end = clock(); 
-//     double build_time = (double)(end - start)/CLOCKS_PER_SEC; 
-
-//     printf("\n"); 
-    
-//     if(hash_type == 0) { 
-//         printf("Hash Type: Regular Perfect Hashing\n"); 
-//     } else { 
-//         printf("Hash Type: Minimal Perfect Hashing\n"); 
-//     }
-
-//     printf("PH Build Time for %d keys and %d key len: %f sec\n", n, key_len, build_time); 
-    
-//     // lookup benchmark 
-//     start = clock(); 
-//     for(int i = 0; i < n; i++) { 
-//         int found = ph_lookup(ht, keys[i]); 
-//         if(found == -1) printf("Error: Key not found\n"); 
-//     }
-//     end = clock(); 
-//     double lookup_time = (double)(end - start)/CLOCKS_PER_SEC; 
-//     printf("PH Lookup Time for %d keys: %f sec\n", n, lookup_time); 
-//     printf("\n"); 
-
-//     ph_free(ht); 
-//     free_keys(keys, n); 
-// }
 
 int main(int argc, char *argv[]) { 
     if(argc != 3) { 

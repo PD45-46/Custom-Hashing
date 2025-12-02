@@ -10,8 +10,8 @@ BENCH_LIB_SRC = $(filter-out benchmarks/benchmark.c, $(wildcard benchmarks/*.c))
 BENCH_LIB_OBJ = $(BENCH_LIB_SRC:.c=.o)
 
 # Test target
-TEST = tests/test_ph1_correctness.c
-TEST_BIN = test_ph1_correctness
+TEST = tests/test_hashing_correctness.c
+TEST_BIN = test_hashing_correctness
 
 # Benchmark target
 BENCH = benchmarks/benchmark.c
