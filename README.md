@@ -177,7 +177,7 @@ Test configurations span dataset sizes from 1,000 to 50,000 keys, using randomly
 | Hashing Type    | 1,000 | 2,500 | 5,000 | 7,500 | 10,000 | 25,000 | 50,000 |
 | --------------- | ----- | ----- | ----- | ----- | ------ | ------ | ------ |
 | Perfect Hashing | 0.269 | 0.705 | 1.33  | 2.13  | 2.94   | 7.84   | 17.81  |
-| Min Perfect     | 6.01  | 1.70  | 3.35  | 5.04  | 6.82   | 18.17  | 42.69  |
+| Min Perfect     | 0.601  | 1.70  | 3.35  | 5.04  | 6.82   | 18.17  | 42.69  |
 
 
 
@@ -216,7 +216,7 @@ Test configurations span dataset sizes from 1,000 to 50,000 keys, using randomly
 | Min Perfect     | 1650  | 4127.6 | 12268.6 | 15562.2 | 40646  | 80657.8 |         |
 
 
-
+### Cache Miss Rates
 
 ### Key Findings
 
