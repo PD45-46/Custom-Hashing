@@ -32,7 +32,7 @@ unsigned int universal_hash(const char* key, Universal_Hash_Params* params) {
     for(int i = 0;  key[i] != '\0'; i++) { 
         unsigned int temp = (unsigned char) key[i]; 
         hash += (unsigned long long)temp * params->coeff_array[i]; 
-        // optional - reduce mod p to avoid overflow
+    
     }
     return (unsigned int)((hash % params->prime) % params->table_size);
 }

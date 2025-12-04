@@ -148,7 +148,7 @@ trial_result_t single_trial(int n, int key_len, int hash_type) {
     // result.cache_metrics = measure_cache_performance(ht, keys, n); 
 
     ph_free(ht); 
-    free_keys(keys, original_n);
+    free_keys(keys, n);
     
     return result; 
 }
