@@ -239,6 +239,8 @@ void benchmark_ph(int n, int key_len, int hash_type) {
     printf("  P95:    %.9f\n", lookup_stats.p95);
     printf("  P99:    %.9f\n", lookup_stats.p99);
     printf("  Max:    %.9f\n", lookup_stats.max);
+    // printf("  StdDev: %.6f\n", lookup_stats.std_dev);
+
     
     printf("\n--- MEMORY USAGE ---\n");
     printf("  Median: %zu bytes (%.2f KB, %.2f MB)\n",
